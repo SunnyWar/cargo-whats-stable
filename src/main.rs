@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 struct Feature {
@@ -77,28 +78,67 @@ fn remove_feature(feature: &str) {
 }
 
 fn check_features() {
+    use std::path::Path;
+    use std::process::Command;
     let mut features = load_features();
-    // Try to locate rust-src for the current toolchain
-    let rustup_home = std::env::var("RUSTUP_HOME").unwrap_or_else(|_| {
-        // Default location for rustup on Windows
-        format!(
-            "{}\\.rustup",
-            std::env::var("USERPROFILE").unwrap_or_default()
-        )
+
+    // Find sysroot using rustc --print sysroot
+    let sysroot = Command::new("rustc")
+        .args(["--print", "sysroot"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string());
+
+    // Compose rust-src path
+    let rust_src_root = sysroot.as_ref().map(|sysroot| {
+        Path::new(sysroot)
+            .join("lib")
+            .join("rustlib")
+            .join("src")
+            .join("rust")
     });
-    let toolchain = std::env::var("RUSTUP_TOOLCHAIN")
-        .unwrap_or_else(|_| "stable-x86_64-pc-windows-msvc".to_string());
-    let rust_src_path = format!(
-        "{}\\toolchains\\{}\\lib\\rustlib\\src\\rust\\compiler\\rustc_feature\\src",
-        rustup_home, toolchain
-    );
-    let accepted_path = format!("{}\\accepted.rs", rust_src_path);
-    let active_path = format!("{}\\active.rs", rust_src_path);
-    let accepted = std::fs::read_to_string(&accepted_path).ok();
-    let active = std::fs::read_to_string(&active_path).ok();
+
+    // Paths for language features
+    let (accepted, active) = if let Some(rust_src_root) = &rust_src_root {
+        let compiler_path = rust_src_root
+            .join("compiler")
+            .join("rustc_feature")
+            .join("src");
+        let accepted_path = compiler_path.join("accepted.rs");
+        let active_path = compiler_path.join("active.rs");
+        let accepted = std::fs::read_to_string(&accepted_path).ok();
+        let active = std::fs::read_to_string(&active_path).ok();
+        (accepted, active)
+    } else {
+        (None, None)
+    };
+
+    // Helper: Search for #[unstable(feature = "name")] in all .rs files under library/
+    fn search_library_feature(rust_src_root: &Path, feature: &str) -> Option<String> {
+        let lib_path = rust_src_root.join("library");
+        if !lib_path.exists() {
+            return None;
+        }
+        let pattern = format!("#[unstable(feature = \"{}\"", feature);
+        let mut found = None;
+        let walker = WalkDir::new(&lib_path).into_iter();
+        for entry in walker
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map(|ext| ext == "rs").unwrap_or(false))
+        {
+            if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                if content.contains(&pattern) {
+                    found = Some(entry.path().display().to_string());
+                    break;
+                }
+            }
+        }
+        found
+    }
 
     for feature in &mut features {
-        // 1. Check unstable book (nightly)
+        // 1. Check unstable book (nightly language feature)
         let url = format!(
             "https://doc.rust-lang.org/nightly/unstable-book/language-features/{}.html",
             feature.name
@@ -106,24 +146,36 @@ fn check_features() {
         let resp = ureq::get(&url).call();
         if resp.is_ok() {
             feature.status = "nightly".to_string();
-        } else if let (Some(accepted), Some(active)) = (accepted.as_ref(), active.as_ref()) {
-            // 2. Check rust-src registry if available
+        } else if let (Some(accepted), Some(active), Some(rust_src_root)) =
+            (accepted.as_ref(), active.as_ref(), rust_src_root.as_ref())
+        {
+            // 2. Check language features in rustc_feature
             if accepted.contains(&format!("\"{}\"", feature.name)) {
                 feature.status = "stable".to_string();
             } else if active.contains(&format!("\"{}\"", feature.name)) {
+                feature.status = "nightly".to_string();
+            } else if search_library_feature(rust_src_root, &feature.name).is_some() {
+                // 3. Check for library features
+                feature.status = "nightly".to_string();
+            } else {
+                feature.status = "unknown".to_string();
+            }
+        } else if let Some(rust_src_root) = rust_src_root.as_ref() {
+            // Only rust-src available, check for library features
+            if search_library_feature(rust_src_root, &feature.name).is_some() {
                 feature.status = "nightly".to_string();
             } else {
                 feature.status = "unknown".to_string();
             }
         } else {
-            // 3. Could not check registry, mark as unknown
+            // Could not check registry, mark as unknown
             feature.status = "unknown".to_string();
         }
         println!("{}: {}", feature.name, feature.status);
     }
     save_features(&features);
     println!("Checked all features.");
-    if accepted.is_none() || active.is_none() {
+    if rust_src_root.is_none() {
         println!(
             "Note: For more accurate results, install rust-src with 'rustup component add rust-src'."
         );
