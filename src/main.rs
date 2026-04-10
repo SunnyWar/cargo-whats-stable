@@ -137,6 +137,30 @@ fn check_features() {
         found
     }
 
+    // Determine max width for feature name column
+    let max_name_len = features
+        .iter()
+        .map(|f| f.name.len())
+        .max()
+        .unwrap_or(10)
+        .max("Feature".len());
+    let status_col_width = 8.max("Status".len());
+
+    println!(
+        "{:<width$}  {:<statw$}",
+        "Feature",
+        "Status",
+        width = max_name_len,
+        statw = status_col_width
+    );
+    println!(
+        "{:-<width$}  {:-<statw$}",
+        "",
+        "",
+        width = max_name_len,
+        statw = status_col_width
+    );
+
     for feature in &mut features {
         // 1. Check unstable book (nightly language feature)
         let url = format!(
@@ -171,7 +195,13 @@ fn check_features() {
             // Could not check registry, mark as unknown
             feature.status = "unknown".to_string();
         }
-        println!("{}: {}", feature.name, feature.status);
+        println!(
+            "{:<width$}  {:<statw$}",
+            feature.name,
+            feature.status,
+            width = max_name_len,
+            statw = status_col_width
+        );
     }
     save_features(&features);
     println!("Checked all features.");

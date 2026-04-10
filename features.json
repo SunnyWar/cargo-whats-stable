@@ -2,5 +2,53 @@
   {
     "name": "portable_simd",
     "status": "nightly"
+  },
+  {
+    "name": "allocator_api",
+    "status": "nightly"
+  },
+  {
+    "name": "new_uninit",
+    "status": "unknown"
+  },
+  {
+    "name": "generic_const_exprs",
+    "status": "unknown"
+  },
+  {
+    "name": "let_chains",
+    "status": "unknown"
+  },
+  {
+    "name": "prt_metadata",
+    "status": "unknown"
+  },
+  {
+    "name": "inline_const",
+    "status": "unknown"
+  },
+  {
+    "name": "unsized_locals",
+    "status": "unknown"
+  },
+  {
+    "name": "asm_const",
+    "status": "unknown"
+  },
+  {
+    "name": "asm_goto",
+    "status": "unknown"
+  },
+  {
+    "name": "simd_ffi",
+    "status": "unknown"
+  },
+  {
+    "name": "type_alias_impl_trait",
+    "status": "unknown"
+  },
+  {
+    "name": "f16",
+    "status": "nightly"
   }
 ]
