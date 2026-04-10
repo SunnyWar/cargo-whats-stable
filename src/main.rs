@@ -78,7 +78,27 @@ fn remove_feature(feature: &str) {
 
 fn check_features() {
     let mut features = load_features();
+    // Try to locate rust-src for the current toolchain
+    let rustup_home = std::env::var("RUSTUP_HOME").unwrap_or_else(|_| {
+        // Default location for rustup on Windows
+        format!(
+            "{}\\.rustup",
+            std::env::var("USERPROFILE").unwrap_or_default()
+        )
+    });
+    let toolchain = std::env::var("RUSTUP_TOOLCHAIN")
+        .unwrap_or_else(|_| "stable-x86_64-pc-windows-msvc".to_string());
+    let rust_src_path = format!(
+        "{}\\toolchains\\{}\\lib\\rustlib\\src\\rust\\compiler\\rustc_feature\\src",
+        rustup_home, toolchain
+    );
+    let accepted_path = format!("{}\\accepted.rs", rust_src_path);
+    let active_path = format!("{}\\active.rs", rust_src_path);
+    let accepted = std::fs::read_to_string(&accepted_path).ok();
+    let active = std::fs::read_to_string(&active_path).ok();
+
     for feature in &mut features {
+        // 1. Check unstable book (nightly)
         let url = format!(
             "https://doc.rust-lang.org/nightly/unstable-book/language-features/{}.html",
             feature.name
@@ -86,14 +106,28 @@ fn check_features() {
         let resp = ureq::get(&url).call();
         if resp.is_ok() {
             feature.status = "nightly".to_string();
+        } else if let (Some(accepted), Some(active)) = (accepted.as_ref(), active.as_ref()) {
+            // 2. Check rust-src registry if available
+            if accepted.contains(&format!("\"{}\"", feature.name)) {
+                feature.status = "stable".to_string();
+            } else if active.contains(&format!("\"{}\"", feature.name)) {
+                feature.status = "nightly".to_string();
+            } else {
+                feature.status = "unknown".to_string();
+            }
         } else {
-            feature.status = "stable".to_string();
+            // 3. Could not check registry, mark as unknown
+            feature.status = "unknown".to_string();
         }
-        // Print status for each feature as it is checked
         println!("{}: {}", feature.name, feature.status);
     }
     save_features(&features);
     println!("Checked all features.");
+    if accepted.is_none() || active.is_none() {
+        println!(
+            "Note: For more accurate results, install rust-src with 'rustup component add rust-src'."
+        );
+    }
 }
 
 fn list_features() {
