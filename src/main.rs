@@ -116,7 +116,3 @@ fn save_features(features: &Vec<Feature>) {
     let mut file = fs::File::create(FEATURES_FILE).unwrap();
     file.write_all(data.as_bytes()).unwrap();
 }
-
-// --- Next Feature: HTTP status checking stub ---
-// To check feature status, we'll use the 'ureq' crate for HTTP requests.
-// Next step: add 'ureq' to Cargo.toml and implement HTTP logic in check_features().
