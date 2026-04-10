@@ -12,7 +12,11 @@ struct Feature {
 const FEATURES_FILE: &str = "features.json";
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let mut args: Vec<String> = std::env::args().collect();
+    // Support invocation as a cargo subcommand: skip the first arg if it's "whats-stable"
+    if args.len() > 1 && args[1] == "whats-stable" {
+        args.remove(1);
+    }
     if args.len() < 2 {
         print_usage();
         return;
