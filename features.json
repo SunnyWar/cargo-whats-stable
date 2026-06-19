@@ -50,5 +50,21 @@
   {
     "name": "f16",
     "status": "nightly"
+  },
+  {
+    "name": "new_zeroed",
+    "status": "unknown"
+  },
+  {
+    "name": "const_trait_impl",
+    "status": "unknown"
+  },
+  {
+    "name": "const_mut_refs",
+    "status": "unknown"
+  },
+  {
+    "name": "strict_provenance",
+    "status": "unknown"
   }
 ]
