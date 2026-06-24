@@ -127,11 +127,11 @@ fn check_features() {
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().map(|ext| ext == "rs").unwrap_or(false))
         {
-            if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                if content.contains(&pattern) {
-                    found = Some(entry.path().display().to_string());
-                    break;
-                }
+            if let Ok(content) = std::fs::read_to_string(entry.path())
+                && content.contains(&pattern)
+            {
+                found = Some(entry.path().display().to_string());
+                break;
             }
         }
         found
